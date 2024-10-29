@@ -1,35 +1,87 @@
-from flask import Flask, render_template
+from flask import Flask, request, jsonify
+from flask_mysqldb import MySQL
+
+from config import config
+
+"""
+GET, POST, PUT, DELETE
+
+"""
 
 app=Flask(__name__)
 
-@app.route("/")
-def index():
-	titulo='IEVN-1001'
-	list=['Pedro','Juan','Fulanito','Sultanito']
-	return render_template('uno.html',titulo = titulo, list = list)
+con=MySQL(app)
 
-@app.route("/user/<string:user>")#esto sirve para pasar parametros
-def user(user):
-	return "El usuario es: {}".format(user)
+@app.route("/alumnos",methods=['GET'])
+def lista_alumnos():
+	try:
+		cursor=con.connection.cursor()
+		sql="select * from alumnos"
+		cursor.execute(sql)
+		datos=cursor.fetchall()
+		alumnos=[]
+		for fila in datos:
+			alumno={"matricula":fila[0],
+					"nombre":fila[1],
+					"apaterno":fila[2],
+					"amaterno":fila[3],
+					"correo":fila[4]}
+			alumnos.append(alumno)#append agrega linea al arreglo
+		return jsonify({'alumnos':alumnos, 'mensaje':'Lista de alumnos', 'exito':True})
+	except Exception as ex:
+		return jsonify({"message": "error {}".format(ex),'exito':False})#, 500
+	
 
-@app.route("/numero/<int:n1>")#esto sirve para pasar parametros
-def numero(n1):
-	return "El número es: {}".format(n1)
-@app.route("/user/<string:nom>/<int:id>")#Se puede tener dos rutas con el mismo nombre, pero no el mismo método
-def datos(nom,id):
-	return "<h1>ID: {} Nombre: {}</h1>".format(id,nom)
+def leer_alumno_bd(matricula):
+	try:
+		cursor=con.connection.cursor()
+		sql="select * from alumnos where matricula={}".format(matricula)
 
-@app.route("/suma/<float:n1>/<float:n2>")#esto sirve para pasar parametros
-def suma(n1,n2):
-	return "La suma es: {}".format(n2+n1)
+		cursor.execute(sql)
+		datos=cursor.fetchone()
+		
+		if datos!=None:
 
-@app.route("/default")
-@app.route("/default/<string:nom>")
+			alumno={"matricula":datos[0],
+					"nombre":datos[1],
+					"apaterno":datos[2],
+					"amaterno":datos[3],
+					"correo":datos[4]}
+			return alumno
+		else:
+			return None
+	except Exception as ex:
+		return jsonify({"message": "error {}".format(ex),'exito':False})#, 500
 
-def nom2(nom = 'Kasss'):
-	return"<h1> El nombre es: {} </h1>".format(nom)
-
-
+@app.route("/alumnos/<mat>",methods=['GET'])
+def leer_alumno(mat):
+	try:
+		alumno=leer_alumno_bd(mat)
+		if alumno!= None:			
+			return jsonify({'alumno':alumno, 'mensaje':'Alumno encontrado', 'exito':True}),
+		else:			
+			return jsonify({'alumno':alumno, 'mensaje':'Alumno no encontrado', 'exito':False}),
+	
+		"""cursor=con.connection.cursor()
+		sql="select * from alumnos"
+		cursor.execute(sql)
+		datos=cursor.fetchall()
+		alumnos=[]
+		for fila in datos:
+			alumno={"matricula":fila[0],
+					"nombre":fila[1],
+					"apaterno":fila[2],
+					"amaterno":fila[3],
+					"correo":fila[4]}
+			alumnos.append(alumno)#append agrega linea al arreglo
+		return jsonify({'alumnos':alumnos, 'mensaje':'Lista de alumnos', 'exito':True})"""
+	except Exception as ex:
+		return jsonify({"message": "error {}".format(ex),'exito':False})#, 500
+	
+def pagina_no_encontrada(error):
+	return "<h1>Página no encontrada</h1>"
 
 if __name__ =="__main__":
-	app.run(debug=True)
+	app.config.from_object(config['development'])
+	app.register_error_handler(404,pagina_no_encontrada)
+	app.run(host='0.0.0.0',port=5000)
